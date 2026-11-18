@@ -1,0 +1,559 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mis gastos</title>
+<style>
+:root {
+  color-scheme: light;
+  --page: #f9f9f7;
+  --surface: #fcfcfb;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --muted: #898781;
+  --grid: #e1e0d9;
+  --axis: #c3c2b7;
+  --border: rgba(11,11,11,0.10);
+  --serie: #2a78d6;
+  --serie-suave: #9ec5f4;
+  --hover: rgba(42,120,214,0.08);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --page: #0d0d0d;
+    --surface: #1a1a19;
+    --ink: #f0efec;
+    --ink-2: #c3c2b7;
+    --muted: #898781;
+    --grid: #2c2c2a;
+    --axis: #383835;
+    --border: rgba(255,255,255,0.10);
+    --serie: #3987e5;
+    --serie-suave: #184f95;
+    --hover: rgba(57,135,229,0.12);
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--page); color: var(--ink);
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+main { max-width: 1120px; margin: 0 auto; padding: 24px 16px 48px; }
+header { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px; margin-bottom: 20px; }
+h1 { font-size: 22px; margin: 0; }
+.sub { color: var(--muted); font-size: 12px; }
+select, input[type=search] {
+  font: inherit; color: var(--ink); background: var(--surface);
+  border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px;
+}
+.grid { display: grid; gap: 16px; grid-template-columns: repeat(12, 1fr); }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; min-width: 0; }
+.card h2 { font-size: 14px; font-weight: 600; margin: 0 0 12px; }
+.span-3 { grid-column: span 3; } .span-5 { grid-column: span 5; } .span-6 { grid-column: span 6; }
+.span-7 { grid-column: span 7; } .span-12 { grid-column: span 12; }
+@media (max-width: 860px) { .span-3 { grid-column: span 6; } .span-5, .span-6, .span-7 { grid-column: span 12; } }
+@media (max-width: 480px) {
+  main { padding: 16px 12px 40px; }
+  .grid { gap: 10px; }
+  .card { padding: 12px; }
+  .tile .valor { font-size: 20px; }
+  .tendencia, .meses { gap: 3px; padding-left: 60px; }
+  .ocultar-movil { display: none; }
+  .foco input { width: 100%; }
+  .foco { width: 100%; }
+}
+#barraWeb { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 6px; }
+#barraWeb button, .boton { font: inherit; font-size: 13px; color: var(--ink); background: var(--surface);
+  border: 1px solid var(--border); border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+.boton.principal { background: var(--serie); color: #fff; border-color: var(--serie); font-size: 15px; padding: 10px 18px; }
+.tile .label { color: var(--ink-2); font-size: 12px; }
+.tile .valor { font-size: 26px; font-weight: 600; margin-top: 4px; }
+.tile .nota { color: var(--muted); font-size: 12px; margin-top: 2px; }
+
+/* barras por categoría */
+.cat { display: grid; grid-template-columns: minmax(90px, 140px) 1fr auto; align-items: center; gap: 10px;
+  padding: 5px 6px; border-radius: 6px; cursor: pointer; }
+.cat:hover { background: var(--hover); }
+.cat.activa { background: var(--hover); outline: 1px solid var(--serie); }
+.cat .nombre { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cat .pista { height: 12px; }
+.cat .barra { height: 12px; background: var(--serie); border-radius: 0 4px 4px 0; min-width: 2px; }
+.cat .monto { font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.cat .pct { color: var(--muted); font-size: 12px; margin-left: 6px; display: inline-block; min-width: 34px; }
+
+/* evolución mensual */
+.tendencia { position: relative; height: 200px; display: flex; align-items: end; gap: 6px;
+  border-bottom: 1px solid var(--axis); padding-top: 22px; padding-left: 72px; }
+.tendencia .guia { position: absolute; left: 0; right: 0; border-top: 1px solid var(--grid); }
+.tendencia .guia span { position: absolute; left: 0; top: -8px; color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.col { flex: 1; height: 100%; display: flex; flex-direction: column; justify-content: end; align-items: center; cursor: pointer; position: relative; z-index: 1; }
+.col .b { width: 100%; max-width: 44px; background: var(--serie-suave); border-radius: 4px 4px 0 0; min-height: 2px; }
+.col.sel .b { background: var(--serie); }
+.col:hover .b { filter: brightness(0.92); }
+.col .v { font-size: 11px; color: var(--ink-2); margin-bottom: 4px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.meses { display: flex; gap: 6px; margin-top: 6px; padding-left: 72px; }
+.meses span { flex: 1; text-align: center; font-size: 11px; color: var(--muted); white-space: nowrap; min-width: 0; }
+
+/* tablas */
+.tabla-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+th { text-align: left; font-weight: 600; color: var(--ink-2); font-size: 12px; padding: 6px 8px; border-bottom: 1px solid var(--axis); }
+td { padding: 7px 8px; border-bottom: 1px solid var(--grid); vertical-align: top; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+td.fecha { white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--ink-2); }
+.chip { display: inline-block; font-size: 12px; color: var(--ink-2); border: 1px solid var(--border); border-radius: 999px; padding: 0 8px; white-space: nowrap; }
+.filtros { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
+.filtros .quitar { font: inherit; font-size: 12px; background: none; border: 1px solid var(--border); color: var(--ink-2); border-radius: 999px; padding: 2px 10px; cursor: pointer; }
+.vacio { color: var(--muted); padding: 12px 0; }
+.card-head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.card-head h2 { margin: 0; }
+.foco { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.foco input { width: 260px; max-width: 100%; }
+.link { cursor: pointer; }
+.link:hover { text-decoration: underline; color: var(--serie); }
+.resumen-foco { display: flex; flex-wrap: wrap; gap: 6px 20px; margin-top: 14px; color: var(--ink-2); font-size: 12px; }
+.resumen-foco b { color: var(--ink); font-size: 14px; font-weight: 600; margin-left: 4px; }
+tr.fila-sel td { background: var(--hover); }
+.aviso { color: var(--ink-2); font-size: 12px; margin-top: 10px; }
+#tip { position: fixed; pointer-events: none; background: var(--ink); color: var(--page); font-size: 12px;
+  padding: 6px 8px; border-radius: 6px; opacity: 0; transition: opacity .1s; z-index: 10; white-space: nowrap; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>Mis gastos</h1>
+      <div class="sub" id="estadoDatos">Banco de Chile · actualizado </div>
+      <div id="barraWeb"></div>
+    </div>
+    <label>Mes&nbsp; <select id="selMes"></select></label>
+  </header>
+  <div id="app"></div>
+</main>
+<div id="tip"></div>
+<script>
+// En el PC los datos vienen incluidos; en la versión web llegan después, al leer el correo.
+let DATOS = null;
+let MENSAJE_VACIO = 'Aún no hay movimientos. Ejecuta <code>py gastos.py sync</code> para leer tus correos.';
+
+const NOMBRES_MES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const pesos = n => "$" + Math.round(n).toLocaleString("es-CL");
+const dolares = n => "US$" + n.toLocaleString("es-CL", {minimumFractionDigits: 2, maximumFractionDigits: 2});
+const montoTxt = d => d.moneda === "CLP" ? pesos(d.monto) : dolares(d.monto);
+const mesLargo = m => { const [a, n] = m.split("-"); return NOMBRES_MES[+n - 1] + " " + a; };
+const mesCorto = m => { const [a, n] = m.split("-"); return NOMBRES_MES[+n - 1].slice(0, 3) + " " + a.slice(2); };
+const mesAnterior = m => { let [a, n] = m.split("-").map(Number); n--; if (!n) { n = 12; a--; } return a + "-" + String(n).padStart(2, "0"); };
+const sumar = arr => arr.reduce((s, d) => s + d.monto, 0);
+
+let clp = [], meses = [], OPCIONES = [];
+// foco: null (todo) o { tipo: "categoria" | "comercio", valor }
+const estado = { mes: null, foco: null, busqueda: "" };
+
+function rangoMeses(hasta, n) {
+  const out = [hasta];
+  while (out.length < n) out.unshift(mesAnterior(out[0]));
+  return out.filter(m => m >= meses[0]);
+}
+const coincide = d => !estado.foco ||
+  (estado.foco.tipo === "categoria" ? d.categoria === estado.foco.valor : d.comercio === estado.foco.valor);
+const etiquetaFoco = f => (f.tipo === "categoria" ? "Categoría: " : "Comercio: ") + f.valor;
+
+// opciones del buscador: categorías y comercios, ordenados por gasto total
+function opcionesFoco() {
+  const tot = (key) => { const o = {}; clp.forEach(d => o[d[key]] = (o[d[key]] || 0) + d.monto); return Object.entries(o).sort((x, y) => y[1] - x[1]).map(e => e[0]); };
+  return [...tot("categoria").map(v => ({ tipo: "categoria", valor: v })), ...tot("comercio").map(v => ({ tipo: "comercio", valor: v }))];
+}
+function enfocar(foco, desplazar) {
+  estado.foco = foco; render();
+  if (desplazar) $("#evolucion").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function render() {
+  const app = $("#app");
+  if (!DATOS || !DATOS.length) {
+    app.innerHTML = '<div class="card vacio">' + MENSAJE_VACIO + '</div>';
+    return;
+  }
+  const delMes = clp.filter(d => d.fecha.startsWith(estado.mes));
+  const total = sumar(delMes);
+  const prev = mesAnterior(estado.mes);
+  const totalPrev = sumar(clp.filter(d => d.fecha.startsWith(prev)));
+  const hayPrev = meses.includes(prev);
+
+  // días transcurridos para el promedio diario
+  const hoy = new Date();
+  const mesHoy = hoy.getFullYear() + "-" + String(hoy.getMonth() + 1).padStart(2, "0");
+  const [a, n] = estado.mes.split("-").map(Number);
+  const dias = estado.mes === mesHoy ? hoy.getDate() : new Date(a, n, 0).getDate();
+
+  let comp = "Sin datos del mes anterior";
+  if (hayPrev && totalPrev > 0) {
+    const pct = Math.round((total - totalPrev) / totalPrev * 100);
+    comp = (pct > 0 ? "▲ " + pct + "% más" : pct < 0 ? "▼ " + Math.abs(pct) + "% menos" : "Igual") +
+      " que " + NOMBRES_MES[+prev.slice(5) - 1] + " (" + pesos(totalPrev) + ")";
+  }
+
+  // por categoría
+  const porCat = {};
+  delMes.forEach(d => porCat[d.categoria] = (porCat[d.categoria] || 0) + d.monto);
+  const cats = Object.entries(porCat).sort((x, y) => y[1] - x[1]);
+  const maxCat = cats.length ? cats[0][1] : 1;
+
+  // evolución mensual (últimos 24 meses) de todo, o del comercio/categoría elegido
+  const rango = rangoMeses(meses[meses.length - 1], innerWidth < 600 ? 12 : 24);
+  const porMes = rango.map(m => clp.filter(d => d.fecha.startsWith(m) && coincide(d)));
+  const totales = porMes.map(sumar);
+  const maxT = Math.max(...totales, 1);
+  const escala = niceMax(maxT);
+  const saltoEtiqueta = innerWidth < 600 ? 3 : rango.length > 18 ? 3 : rango.length > 12 ? 2 : 1;
+  let resumenFoco = "";
+  if (estado.foco) {
+    const conGasto = rango.map((m, i) => ({ m, t: totales[i], n: porMes[i].length })).filter(x => x.n);
+    const totalFoco = sumar(conGasto.map(x => ({ monto: x.t })));
+    const desde = conGasto.length ? rango.indexOf(conGasto[0].m) : 0;
+    const mesesPeriodo = conGasto.length ? rango.length - desde : 0;
+    const mayor = conGasto.reduce((a, x) => (!a || x.t > a.t ? x : a), null);
+    resumenFoco = `
+      <div class="resumen-foco">
+        <span>Total <b>${pesos(totalFoco)}</b></span>
+        <span>Promedio mensual <b>${mesesPeriodo ? pesos(totalFoco / mesesPeriodo) : "—"}</b></span>
+        <span>Compras <b>${conGasto.reduce((s, x) => s + x.n, 0)}</b></span>
+        <span>Mes más alto <b>${mayor ? esc(mesLargo(mayor.m)) + " · " + pesos(mayor.t) : "—"}</b></span>
+      </div>
+      <div class="tabla-wrap" style="margin-top:12px"><table><thead><tr><th>Mes</th><th class="num">Compras</th><th class="num">Total</th></tr></thead><tbody>
+        ${rango.slice(desde).map((m, i) => ({ m, t: totales[desde + i], n: porMes[desde + i].length })).reverse()
+          .map(x => `<tr class="${x.m === estado.mes ? "fila-sel" : ""}"><td class="link" data-irmes="${x.m}">${esc(mesLargo(x.m))}</td><td class="num">${x.n}</td><td class="num">${pesos(x.t)}</td></tr>`).join("")}
+      </tbody></table></div>`;
+  }
+
+  // principales comercios del mes
+  const porCom = {};
+  delMes.forEach(d => { const c = porCom[d.comercio] ||= { total: 0, n: 0, cat: d.categoria }; c.total += d.monto; c.n++; });
+  const comercios = Object.entries(porCom).sort((x, y) => y[1].total - x[1].total).slice(0, 8);
+
+  // recurrentes: comercios presentes en 3 o más meses distintos
+  const presencia = {};
+  clp.forEach(d => { const p = presencia[d.comercio] ||= { meses: new Set(), total: 0, cat: d.categoria }; p.meses.add(d.fecha.slice(0, 7)); p.total += d.monto; });
+  const recurrentes = Object.entries(presencia).filter(([, p]) => p.meses.size >= 3)
+    .map(([c, p]) => ({ c, n: p.meses.size, prom: p.total / p.meses.size, cat: p.cat }))
+    .sort((x, y) => y.prom - x.prom).slice(0, 8);
+
+  // dólares del mes
+  const usd = DATOS.filter(d => d.moneda === "USD" && d.fecha.startsWith(estado.mes));
+
+  // movimientos filtrados
+  const q = estado.busqueda.toLowerCase();
+  const movs = DATOS.filter(d => d.fecha.startsWith(estado.mes) && coincide(d) &&
+    (!q || d.comercio.toLowerCase().includes(q)));
+
+  app.innerHTML = `
+  <div class="grid">
+    <div class="card tile span-3"><div class="label">Gasto de ${esc(mesLargo(estado.mes))}</div>
+      <div class="valor">${pesos(total)}</div><div class="nota">${esc(comp)}</div></div>
+    <div class="card tile span-3"><div class="label">Compras</div>
+      <div class="valor">${delMes.length}</div><div class="nota">Ticket promedio ${delMes.length ? pesos(total / delMes.length) : "—"}</div></div>
+    <div class="card tile span-3"><div class="label">Promedio diario</div>
+      <div class="valor">${pesos(total / dias)}</div><div class="nota">Sobre ${dias} días</div></div>
+    <div class="card tile span-3"><div class="label">Mayor categoría</div>
+      <div class="valor" style="font-size:20px">${cats.length ? esc(cats[0][0]) : "—"}</div>
+      <div class="nota">${cats.length ? pesos(cats[0][1]) + " · " + Math.round(cats[0][1] / total * 100) + "% del mes" : ""}</div></div>
+
+    <div class="card span-5"><h2>Gasto por categoría</h2>
+      ${cats.length ? cats.map(([c, v]) => `
+        <div class="cat ${estado.foco && estado.foco.tipo === "categoria" && estado.foco.valor === c ? "activa" : ""}" data-cat="${esc(c)}" title="Ver ${esc(c)} mes a mes">
+          <span class="nombre">${esc(c)}</span>
+          <span class="pista"><div class="barra" style="width:${(v / maxCat * 100).toFixed(1)}%"></div></span>
+          <span class="monto">${pesos(v)}<span class="pct">${Math.round(v / total * 100)}%</span></span>
+        </div>`).join("") : '<div class="vacio">Sin compras este mes.</div>'}
+      ${usd.length ? `<div class="aviso">Además: ${usd.length} compra(s) en dólares por ${dolares(sumar(usd))}, no sumadas a los totales en pesos.</div>` : ""}
+    </div>
+
+    <div class="card span-7" id="evolucion">
+      <div class="card-head">
+        <h2>Gasto por mes${estado.foco ? " · " + esc(estado.foco.valor) : ""}</h2>
+        <div class="foco">
+          <input type="search" id="selFoco" list="opcionesFoco" placeholder="Elegir comercio o categoría"
+            value="${estado.foco ? esc(etiquetaFoco(estado.foco)) : ""}">
+          ${estado.foco ? `<button class="quitar" id="quitarFoco">Ver todo ✕</button>` : ""}
+        </div>
+      </div>
+      <div class="tendencia" id="tendencia">
+        ${[1, 0.5].map(f => `<div class="guia" style="bottom:${f * 100 * (200 - 22) / 200}%"><span>${pesos(escala * f)}</span></div>`).join("")}
+        ${rango.map((m, i) => `<div class="col ${m === estado.mes ? "sel" : ""}" data-mes="${m}" data-tip="${esc(mesLargo(m))}: ${pesos(totales[i])} · ${porMes[i].length} compra(s)">
+          ${m === estado.mes ? `<div class="v">${pesos(totales[i])}</div>` : ""}
+          <div class="b" style="height:${(totales[i] / escala * 100).toFixed(1)}%"></div></div>`).join("")}
+      </div>
+      <div class="meses">${rango.map((m, i) => `<span>${(rango.length - 1 - i) % saltoEtiqueta ? "" : mesCorto(m)}</span>`).join("")}</div>
+      ${resumenFoco || '<div class="aviso">Elige un comercio o categoría arriba, o haz clic en uno de la página, para ver cuánto gastas en él cada mes.</div>'}
+    </div>
+
+    <div class="card span-6"><h2>Dónde más gastaste</h2>
+      ${comercios.length ? `<div class="tabla-wrap"><table><thead><tr><th>Comercio</th><th class="ocultar-movil">Categoría</th><th class="num">Compras</th><th class="num">Total</th></tr></thead><tbody>
+        ${comercios.map(([c, v]) => `<tr><td class="link" data-com="${esc(c)}">${esc(c)}</td><td class="ocultar-movil"><span class="chip">${esc(v.cat)}</span></td><td class="num">${v.n}</td><td class="num">${pesos(v.total)}</td></tr>`).join("")}
+      </tbody></table></div>` : '<div class="vacio">Sin compras este mes.</div>'}
+    </div>
+
+    <div class="card span-6"><h2>Gastos recurrentes</h2>
+      ${recurrentes.length ? `<div class="tabla-wrap"><table><thead><tr><th>Comercio</th><th class="num">Meses</th><th class="num">Promedio mensual</th></tr></thead><tbody>
+        ${recurrentes.map(r => `<tr><td><span class="link" data-com="${esc(r.c)}">${esc(r.c)}</span> <span class="chip">${esc(r.cat)}</span></td><td class="num">${r.n}</td><td class="num">${pesos(r.prom)}</td></tr>`).join("")}
+      </tbody></table></div><div class="aviso">Comercios donde compraste en 3 meses o más: útil para encontrar suscripciones.</div>`
+      : '<div class="vacio">Aparecerán cuando haya al menos 3 meses de datos.</div>'}
+    </div>
+
+    <div class="card span-12"><h2>Movimientos</h2>
+      <div class="filtros">
+        <input type="search" id="buscar" placeholder="Buscar comercio" value="${esc(estado.busqueda)}">
+        ${estado.foco ? `<button class="quitar" id="quitarCat">${esc(etiquetaFoco(estado.foco))} ✕</button>` : ""}
+        <span class="sub">${movs.length} movimiento(s)</span>
+      </div>
+      <div class="tabla-wrap"><table><thead><tr><th>Fecha</th><th>Comercio</th><th>Categoría</th><th class="ocultar-movil">Medio</th><th class="num">Monto</th></tr></thead><tbody>
+        ${movs.map(d => `<tr><td class="fecha">${d.fecha.slice(8)}/${d.fecha.slice(5, 7)} ${esc(d.hora)}</td><td class="link" data-com="${esc(d.comercio)}">${esc(d.comercio)}</td>
+          <td><span class="chip">${esc(d.categoria)}</span></td><td class="sub ocultar-movil">${esc(d.tipo)} · ${esc(d.medio)}</td><td class="num">${montoTxt(d)}</td></tr>`).join("")}
+      </tbody></table></div>
+    </div>
+  </div>`;
+
+  app.querySelectorAll(".cat").forEach(el => el.onclick = () => {
+    const ya = estado.foco && estado.foco.tipo === "categoria" && estado.foco.valor === el.dataset.cat;
+    enfocar(ya ? null : { tipo: "categoria", valor: el.dataset.cat });
+  });
+  app.querySelectorAll("[data-com]").forEach(el => el.onclick = () =>
+    enfocar({ tipo: "comercio", valor: el.dataset.com }, true));
+  app.querySelectorAll("[data-irmes]").forEach(el => el.onclick = () => {
+    estado.mes = el.dataset.irmes; $("#selMes").value = estado.mes; render();
+  });
+  const sf = $("#selFoco");
+  sf.onchange = () => {
+    const op = OPCIONES.find(o => etiquetaFoco(o) === sf.value.trim());
+    if (op) enfocar(op);
+    else if (!sf.value.trim()) enfocar(null);
+  };
+  const qf = $("#quitarFoco"); if (qf) qf.onclick = () => enfocar(null);
+  app.querySelectorAll(".col").forEach(el => {
+    el.onclick = () => { estado.mes = el.dataset.mes; $("#selMes").value = estado.mes; render(); };
+    el.onmousemove = e => mostrarTip(e, el.dataset.tip);
+    el.onmouseleave = ocultarTip;
+  });
+  const qc = $("#quitarCat"); if (qc) qc.onclick = () => enfocar(null);
+  const b = $("#buscar");
+  b.oninput = () => { estado.busqueda = b.value; const pos = b.selectionStart; render(); const nb = $("#buscar"); nb.focus(); nb.setSelectionRange(pos, pos); };
+}
+
+function niceMax(v) {
+  const p = Math.pow(10, Math.floor(Math.log10(v)));
+  for (const m of [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10]) if (m * p >= v) return m * p;
+  return 10 * p;
+}
+function mostrarTip(e, txt) {
+  const t = $("#tip"); t.textContent = txt; t.style.opacity = 1;
+  t.style.left = Math.min(e.clientX + 12, innerWidth - t.offsetWidth - 8) + "px";
+  t.style.top = (e.clientY - 34) + "px";
+}
+function ocultarTip() { $("#tip").style.opacity = 0; }
+
+// Carga (o recarga) los datos y dibuja el panel.
+function iniciar(datos) {
+  DATOS = datos;
+  clp = DATOS.filter(d => d.moneda === "CLP");
+  meses = [...new Set(DATOS.map(d => d.fecha.slice(0, 7)))].sort();
+  if (!estado.mes || !meses.includes(estado.mes)) estado.mes = meses[meses.length - 1] || null;
+  OPCIONES = opcionesFoco();
+  const sel = $("#selMes");
+  sel.innerHTML = [...meses].reverse().map(m => `<option value="${m}">${mesLargo(m)}</option>`).join("");
+  if (estado.mes) sel.value = estado.mes;
+  sel.parentElement.style.display = meses.length ? "" : "none";
+  sel.onchange = () => { estado.mes = sel.value; render(); };
+  let dl = $("#opcionesFoco");
+  if (!dl) { dl = document.createElement("datalist"); dl.id = "opcionesFoco"; document.body.appendChild(dl); }
+  dl.innerHTML = "";
+  OPCIONES.forEach(o => { const op = document.createElement("option"); op.value = etiquetaFoco(o); dl.appendChild(op); });
+  render();
+}
+if (DATOS) iniciar(DATOS);
+</script>
+<!-- Versión web: lee los avisos del banco directo desde Outlook, en el navegador.
+     Los movimientos quedan guardados solo en este dispositivo (localStorage). -->
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.1/lib/msal-browser.min.js"></script>
+<script>
+(function () {
+  const CONFIG = {"clientId": "3c14d3b8-490a-4d56-bd01-4a317e088b4f", "remitentes": ["enviodigital@bancochile.cl"], "categorias": {"Efectivo": ["giro en"], "Delivery y comida": ["uber eats", "rappi", "pedidosya", "pedidos ya", "didi food", "justo", "mcdonald", "burger king", "kfc", "starbucks", "juan maestro", "domino", "papa john", "pizza hut", "doggis", "tarragona", "dunkin", "subway", "sushi", "restaurant", "cafeteria", "mc donalds", "kentucky", "- bk ", "-bk ", "wendys", "papajohns", "momotaro", "ramen", "chef metalero", "nice2meat", "siracusa", "bella china", "acai", "pronto ", "grupo gastronomic", "fonda ", "hi panda", "snackcenter", "snack cen", "happy break", "dulce", "donde margarita", "tierra frutos", "pastel", "*leonardom"], "Transporte": ["red movilidad", "metro de santiago", "bip", "uber", "cabify", "didi", "indriver", "turbus", "pullman", "latam", "sky airline", "jetsmart", "costanera norte", "vespucio", "autopista", "estacionamiento", "parking", "tur bus", "metro ", "com terminal", "consorcio nunoa"], "Combustible": ["copec", "shell", "aramco", "petrobras", "enex", "terpel"], "Supermercado": ["lider", "walmart", "jumbo", "unimarc", "santa isabel", "tottus", "acuenta", "alvi", "ekono", "oxxo", "ok market", "central mayorista", "mayorista 10", "supermercado", "minimarket", "sta isabel", "minimarke", "nextmarket", "huevo", "botilleria", "luis pasteur"], "Farmacia y salud": ["cruz verde", "salcobrand", "ahumada", "dr simi", "farmacia", "clinica", "integramedica", "redsalud", "laboratorio", "isapre", "fonasa", "dental", "c. verde", "ahum ", "farm ", "policlinico", "optiexpress", "lentesplu", "centro visual", "preunic"], "Suscripciones": ["netflix", "spotify", "disney", "hbo", "amazon prime", "prime video", "youtube", "apple.com", "icloud", "google", "openai", "chatgpt", "anthropic", "claude.ai", "microsoft", "xbox", "playstation", "steam", "paramount", "crunchyroll", "proton"], "Cuentas y servicios": ["entel", "movistar", "wom", "claro", "vtr", "gtd", "mundo pacifico", "enel", "cge", "aguas andinas", "esval", "essbio", "metrogas", "lipigas", "abastible", "gasco", "bicesegur"], "Compras": ["falabella", "paris", "ripley", "hites", "la polar", "mercadolibre", "mercado libre", "aliexpress", "temu", "shein", "amazon", "sodimac", "easy", "homecenter", "ikea", "h&m", "zara", "mobile store"], "Entretención": ["cinemark", "cineplanet", "hoyts", "ticketmaster", "puntoticket", "passline", "pass line", "cinepolis", "insert coin", "level up", "akirastor", "cerveza", "barblack", "*kunst"], "Yuyu": ["INVERSIONES CITA"], "Deporte": ["decathlon", "deportes", "bike cente", "playhocke"], "Viajes": ["airbnb"], "Almuerzos": ["sodex"], "Oficina": ["la concepcion"], "Vecinos": ["himcr"], "Pokémon": ["updown", "tiendatec", "newplayer", "arkham comics", "vintage retro", "drawn prov", "polvo estelar"], "Donaciones": ["virtual*fund"], "Ropa": ["*mota"], "Electrónica": ["joigo", "central gamer"]}};
+  const SCOPES = ["Mail.Read"];
+  const CLAVE = "misgastos.v1";
+
+  // ------------------------------------------------------------ lector (igual que gastos.py)
+  const RE_COMPRA = /compra por\s*(?<moneda>US\$|USD|\$)\s*(?<monto>\d[\d.,]*)\s+con\s+(?:cargo a\s+)?(?<medio>.+?)\s+en\s+(?<comercio>.+?)\s+el\s+(?<fecha>\d{1,2}\/\d{1,2}\/\d{4})(?:\s+(?<hora>\d{1,2}:\d{2}))?/i;
+  const RE_GIRO = /giro en (?<lugar>.+?) por\s*(?<moneda>US\$|USD|\$)\s*(?<monto>\d[\d.,]*)\s+con\s+(?:cargo a\s+)?(?<medio>.+?)\s+el\s+(?<fecha>\d{1,2}\/\d{1,2}\/\d{4})(?:\s+(?<hora>\d{1,2}:\d{2}))?/i;
+  const RE_AVISO = /te informamos que se ha realizado/i;
+
+  const sinTildes = s => s.normalize("NFD").replace(/[̀-ͯ]/g, "");
+  const normalizar = s => sinTildes(s).toLowerCase().replace(/\s+/g, " ").trim();
+  const limpiar = s => s.replace(/ /g, " ").replace(/\s+/g, " ").trim();
+
+  function aNumero(monto, moneda) {
+    if (moneda === "$") return Math.round(Number(monto.replace(/,\d{1,2}$/, "").replace(/[.,]/g, "")));
+    if (monto.includes(",") && monto.includes(".")) {
+      monto = monto.lastIndexOf(",") > monto.lastIndexOf(".") ? monto.replace(/\./g, "").replace(",", ".") : monto.replace(/,/g, "");
+    } else if (monto.includes(",")) monto = monto.replace(",", ".");
+    return Number(monto);
+  }
+
+  function parsear(texto) {
+    texto = limpiar(texto);
+    let m = RE_COMPRA.exec(texto), comercio;
+    if (m) comercio = m.groups.comercio.replace(/^[ .]+|[ .]+$/g, "");
+    else {
+      m = RE_GIRO.exec(texto);
+      if (!m) return null;
+      comercio = "Giro en " + m.groups.lugar.trim().toLowerCase();
+    }
+    const g = m.groups;
+    const [dia, mes, anio] = g.fecha.split("/");
+    const medio = g.medio.trim(), medioN = normalizar(medio);
+    const tipo = medioN.includes("credito") ? "Crédito" : (medioN.includes("cuenta") || medioN.includes("debito")) ? "Débito" : "Otro";
+    return {
+      fecha: `${anio}-${mes.padStart(2, "0")}-${dia.padStart(2, "0")}`, hora: g.hora ? g.hora.padStart(5, "0") : "",
+      monto: aNumero(g.monto, g.moneda), moneda: g.moneda === "$" ? "CLP" : "USD",
+      comercio, medio, tipo,
+    };
+  }
+
+  function categorizar(comercio) {
+    const c = " " + normalizar(comercio) + " ";
+    for (const [cat, claves] of Object.entries(CONFIG.categorias))
+      if (claves.some(k => c.includes(sinTildes(k).toLowerCase()))) return cat;
+    return "Sin categoría";
+  }
+
+  // ------------------------------------------------------------ datos guardados en el equipo
+  function cargar() {
+    try { return JSON.parse(localStorage.getItem(CLAVE)) || { movs: {}, ultimo: {}, actualizado: null }; }
+    catch (e) { return { movs: {}, ultimo: {}, actualizado: null }; }
+  }
+  function guardar(d) { try { localStorage.setItem(CLAVE, JSON.stringify(d)); } catch (e) { /* sin espacio o modo privado */ } }
+  function mostrar(d) {
+    const lista = Object.values(d.movs).map(m => ({ ...m, categoria: categorizar(m.comercio) }))
+      .sort((a, b) => (b.fecha + b.hora).localeCompare(a.fecha + a.hora));
+    iniciar(lista);
+  }
+
+  // ------------------------------------------------------------ interfaz
+  const barra = document.getElementById("barraWeb");
+  const estadoTxt = t => { document.getElementById("estadoDatos").textContent = t; };
+  function resumen(d, extra) {
+    const n = Object.keys(d.movs).length;
+    const cuando = d.actualizado ? new Date(d.actualizado).toLocaleString("es-CL", { dateStyle: "short", timeStyle: "short" }) : "nunca";
+    estadoTxt(`Banco de Chile · ${n} movimientos · actualizado ${cuando}${extra ? " · " + extra : ""}`);
+  }
+
+  // ------------------------------------------------------------ Microsoft
+  const base = location.origin + location.pathname.replace(/index\.html$/, "");
+  const app = new msal.PublicClientApplication({
+    auth: { clientId: CONFIG.clientId, authority: "https://login.microsoftonline.com/consumers", redirectUri: base },
+    cache: { cacheLocation: "localStorage" },
+  });
+
+  async function obtenerToken() {
+    const cuenta = app.getAllAccounts()[0];
+    if (!cuenta) { await app.loginRedirect({ scopes: SCOPES }); return null; }
+    try {
+      return (await app.acquireTokenSilent({ scopes: SCOPES, account: cuenta })).accessToken;
+    } catch (e) {
+      if (e instanceof msal.InteractionRequiredAuthError) { await app.acquireTokenRedirect({ scopes: SCOPES, account: cuenta }); return null; }
+      throw e;
+    }
+  }
+
+  let ocupado = false;
+  async function sincronizar() {
+    if (ocupado) return;
+    ocupado = true;
+    const boton = document.getElementById("btnActualizar");
+    if (boton) boton.disabled = true;
+    try {
+      const tk = await obtenerToken();
+      if (!tk) return;
+      const d = cargar();
+      let nuevos = 0, noReconocidos = 0;
+      for (const rem of CONFIG.remitentes) {
+        estadoTxt("Leyendo correos…");
+        // Desde el último correo leído (con 2 días de margen); la primera vez, todo.
+        const desde = d.ultimo[rem] ? new Date(new Date(d.ultimo[rem]).getTime() - 2 * 864e5).toISOString() : "2000-01-01T00:00:00Z";
+        let url = "https://graph.microsoft.com/v1.0/me/messages?" + new URLSearchParams({
+          "$filter": `receivedDateTime ge ${desde} and from/emailAddress/address eq '${rem}'`,
+          "$orderby": "receivedDateTime desc", "$select": "id,receivedDateTime,body", "$top": "100",
+        });
+        let leidos = 0;
+        while (url) {
+          const r = await fetch(url, { headers: { Authorization: "Bearer " + tk, Prefer: 'outlook.body-content-type="text"' } });
+          if (!r.ok) throw new Error(`Microsoft respondió ${r.status}`);
+          const pag = await r.json();
+          for (const m of pag.value) {
+            leidos++;
+            if (!d.ultimo[rem] || m.receivedDateTime > d.ultimo[rem]) d.ultimo[rem] = m.receivedDateTime;
+            if (d.movs[m.id]) continue;
+            const texto = (m.body && m.body.content) || "";
+            const mov = parsear(texto);
+            if (mov) { d.movs[m.id] = mov; nuevos++; }
+            else if (RE_AVISO.test(texto)) noReconocidos++;
+          }
+          estadoTxt(`Leyendo correos… ${leidos}`);
+          url = pag["@odata.nextLink"];
+        }
+      }
+      d.actualizado = new Date().toISOString();
+      guardar(d);
+      mostrar(d);
+      resumen(d, (nuevos ? `${nuevos} nuevos` : "sin novedades") + (noReconocidos ? ` · ${noReconocidos} avisos sin reconocer` : ""));
+    } catch (e) {
+      estadoTxt("No se pudo actualizar: " + e.message);
+    } finally {
+      ocupado = false;
+      if (boton) boton.disabled = false;
+    }
+  }
+
+  function pantallaInicio() {
+    barra.innerHTML = "";
+    estadoTxt("Banco de Chile");
+    MENSAJE_VACIO = 'Para ver tus gastos, inicia sesión con la cuenta Microsoft donde llegan los avisos del banco. ' +
+      'La página solo lee tus correos; los movimientos quedan guardados en este dispositivo.' +
+      '<div style="margin-top:14px"><button class="boton principal" id="btnEntrar">Iniciar sesión con Microsoft</button></div>';
+    iniciar([]);
+    document.getElementById("btnEntrar").onclick = () => app.loginRedirect({ scopes: SCOPES });
+  }
+
+  function barraConectado() {
+    barra.innerHTML = '<button id="btnActualizar">Actualizar</button><button id="btnSalir">Cerrar sesión</button>';
+    document.getElementById("btnActualizar").onclick = sincronizar;
+    document.getElementById("btnSalir").onclick = () => {
+      if (!confirm("¿Cerrar sesión y borrar los movimientos guardados en este dispositivo?")) return;
+      localStorage.removeItem(CLAVE);
+      app.logoutRedirect({ account: app.getAllAccounts()[0], postLogoutRedirectUri: base });
+    };
+  }
+
+  (async () => {
+    try {
+      await app.initialize();
+      await app.handleRedirectPromise();
+    } catch (e) {
+      estadoTxt("Error al iniciar sesión: " + e.message);
+    }
+    if (!app.getAllAccounts().length) return pantallaInicio();
+    barraConectado();
+    MENSAJE_VACIO = "Leyendo tus correos por primera vez…";
+    const d = cargar();
+    mostrar(d);
+    resumen(d);
+    sincronizar();
+  })();
+})();
+</script>
+
+</body>
+</html>
